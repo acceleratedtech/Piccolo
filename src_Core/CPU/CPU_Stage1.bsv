@@ -23,6 +23,7 @@ import FIFOF        :: *;
 import GetPut       :: *;
 import ClientServer :: *;
 import ConfigReg    :: *;
+import DefaultValue :: *;
 
 // ----------------
 // BSV additional libs
@@ -46,6 +47,8 @@ import EX_ALU_functions :: *;
 // 'C' extension (16b compressed instructions)
 import CPU_Decode_C     :: *;
 `endif
+
+import TagMonitor       :: *;
 
 // ================================================================
 // Interface
@@ -83,7 +86,8 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
 `endif
 		      CSR_RegFile_IFC  csr_regfile,
 		      IMem_IFC         imem,
-		      Priv_Mode        cur_priv)
+		      Priv_Mode        cur_priv,
+		      TagMonitor#(XLEN, TagT) tagger)
                     (CPU_Stage1_IFC);
 
    FIFOF #(Token) f_reset_reqs <- mkFIFOF;
@@ -123,7 +127,7 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
    match { .busy1a, .rs1a } = fn_gpr_bypass (bypass_from_stage3, rs1, rs1_val);
    match { .busy1b, .rs1b } = fn_gpr_bypass (bypass_from_stage2, rs1, rs1a);
    Bool rs1_busy = (busy1a || busy1b);
-   Word rs1_val_bypassed = ((rs1 == 0) ? 0 : rs1b);
+   RegValue rs1_val_bypassed = ((rs1 == 0) ? 0 : rs1b);
 
    // Register rs2 read and bypass
    let rs2 = decoded_instr.rs2;
@@ -131,7 +135,7 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
    match { .busy2a, .rs2a } = fn_gpr_bypass (bypass_from_stage3, rs2, rs2_val);
    match { .busy2b, .rs2b } = fn_gpr_bypass (bypass_from_stage2, rs2, rs2a);
    Bool rs2_busy = (busy2a || busy2b);
-   Word rs2_val_bypassed = ((rs2 == 0) ? 0 : rs2b);
+   RegValue rs2_val_bypassed = ((rs2 == 0) ? 0 : rs2b);
 
 `ifdef ISA_F
    // FP Register rs1 read and bypass
@@ -139,14 +143,14 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
    match { .fbusy1a, .frs1a } = fn_fpr_bypass (fbypass_from_stage3, rs1, frs1_val);
    match { .fbusy1b, .frs1b } = fn_fpr_bypass (fbypass_from_stage2, rs1, frs1a);
    Bool frs1_busy = (fbusy1a || fbusy1b);
-   WordFL frs1_val_bypassed = frs1b;
+   RegValueFL frs1_val_bypassed = frs1b;
 
    // FP Register rs2 read and bypass
    let frs2_val = fpr_regfile.read_rs2 (rs2);
    match { .fbusy2a, .frs2a } = fn_fpr_bypass (fbypass_from_stage3, rs2, frs2_val);
    match { .fbusy2b, .frs2b } = fn_fpr_bypass (fbypass_from_stage2, rs2, frs2a);
    Bool frs2_busy = (fbusy2a || fbusy2b);
-   WordFL frs2_val_bypassed = frs2b;
+   RegValueFL frs2_val_bypassed = frs2b;
 
    // FP Register rs3 read and bypass
    let rs3 = decoded_instr.rs3;
@@ -154,7 +158,7 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
    match { .fbusy3a, .frs3a } = fn_fpr_bypass (fbypass_from_stage3, rs3, frs3_val);
    match { .fbusy3b, .frs3b } = fn_fpr_bypass (fbypass_from_stage2, rs3, frs3a);
    Bool frs3_busy = (fbusy3a || fbusy3b);
-   WordFL frs3_val_bypassed = frs3b;
+   RegValueFL frs3_val_bypassed = frs3b;
 `endif
 
    // ALU function
@@ -166,28 +170,37 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
 				instr_C        : instr_C,
 `endif
 				decoded_instr  : decoded_instr,
-				rs1_val        : rs1_val_bypassed,
-				rs2_val        : rs2_val_bypassed,
+				rs1_val        : rs1_val_bypassed.data,
+				rs2_val        : rs2_val_bypassed.data,
+				rs1_tag        : rs1_val_bypassed.tag,
+				rs2_tag        : rs2_val_bypassed.tag,
 `ifdef ISA_F
-				frs1_val       : frs1_val_bypassed,
-				frs2_val       : frs2_val_bypassed,
-				frs3_val       : frs3_val_bypassed,
+				frs1_val       : frs1_val_bypassed.data,
+				frs2_val       : frs2_val_bypassed.data,
+				frs3_val       : frs3_val_bypassed.data,
+				frs1_tag       : frs1_val_bypassed.tag,
+				frs2_tag       : frs2_val_bypassed.tag,
+				frs3_tag       : frs3_val_bypassed.tag,
 				fcsr_frm       : csr_regfile.read_frm,
 `endif
 				mstatus        : csr_regfile.read_mstatus,
 				misa           : csr_regfile.read_misa };
 
-   let alu_outputs = fv_ALU (alu_inputs);
+   let alu_outputs = fv_ALU (alu_inputs, tagger);
 
    let data_to_stage2 = Data_Stage1_to_Stage2 {pc            : pc,
 					       instr         : instr,
 					       op_stage2     : alu_outputs.op_stage2,
 					       rd            : alu_outputs.rd,
 					       addr          : alu_outputs.addr,
+					       addr_tag      : alu_outputs.addr_tag,
 					       val1          : alu_outputs.val1,
 					       val2          : alu_outputs.val2,
+					       tag1          : alu_outputs.tag1,
+					       tag2          : alu_outputs.tag2,
 `ifdef ISA_F
 					       val3          : alu_outputs.val3,
+					       tag3          : alu_outputs.tag3,
 					       rd_in_fpr     : alu_outputs.rd_in_fpr,
 					       rounding_mode : alu_outputs.rm,
 `endif
@@ -255,12 +268,68 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
 				    tval:     tval};
 
 	 let fall_through_pc = pc + (imem.is_i32_not_i16 ? 4 : 2);
+         let offset = imem.is_i32_not_i16 ? 4 : 2;
+	 let offset_tag = tagger.constant_tag(offset);
+         let pc_tag = tagger.pc_tag(pc);
+         let fall_through_pc_tag = tagger.alu_add(TaggedData {data: pc, tag: pc_tag}, TaggedData { data: offset, tag: offset_tag }, fall_through_pc);
+
 	 let next_pc = ((alu_outputs.control == CONTROL_BRANCH)
 			? alu_outputs.addr
 			: fall_through_pc);
+	 let next_pc_tag = ((alu_outputs.control == CONTROL_BRANCH)
+			? alu_outputs.addr_tag
+			: fall_through_pc_tag);
+
+         // FIXME: Check for tagging policy exceptions
+         let control = alu_outputs.control;
+         if (!tagger.is_legal_next_pc(TaggedData {data: next_pc, tag: next_pc_tag})) begin
+            // illegal next pc according to tagging policy
+            if (control != CONTROL_TRAP) begin
+		control = CONTROL_TRAP;
+                ostatus = OSTATUS_NONPIPE;
+                trap_info.exc_code = exc_code_TAG_NEXT_PC_FAULT;
+            end
+         end
+         if (alu_outputs.op_stage2 == OP_Stage2_LD) begin
+             if (!tagger.is_legal_load_address(TaggedData {data: alu_outputs.addr, tag: alu_outputs.addr_tag}, pc)) begin
+                if (control != CONTROL_TRAP) begin
+                    control = CONTROL_TRAP;
+                    ostatus = OSTATUS_NONPIPE;
+                    trap_info.exc_code = exc_code_TAG_LOAD_FAULT;
+		end
+             end
+         end
+         if (alu_outputs.op_stage2 == OP_Stage2_ST) begin
+             if (!tagger.is_legal_store_address(TaggedData {data: alu_outputs.addr, tag: alu_outputs.addr_tag}, pc)) begin
+                if (control != CONTROL_TRAP) begin
+                    control = CONTROL_TRAP;
+                    ostatus = OSTATUS_NONPIPE;
+                    trap_info.exc_code = exc_code_TAG_STORE_FAULT;
+                end
+             end
+         end
+`ifdef ISA_A
+         if (alu_outputs.op_stage2 == OP_Stage2_AMO) begin
+             // for now treat this as a load and a store
+             if (!tagger.is_legal_load_address(TaggedData {data: alu_outputs.addr, tag: alu_outputs.addr_tag}, pc)) begin
+                if (control != CONTROL_TRAP) begin
+                    control = CONTROL_TRAP;
+                    ostatus = OSTATUS_NONPIPE;
+                    trap_info.exc_code = exc_code_TAG_LOAD_FAULT;
+                end
+             end
+             if (!tagger.is_legal_store_address(TaggedData {data: alu_outputs.addr, tag: alu_outputs.addr_tag}, pc)) begin
+                if (control != CONTROL_TRAP) begin
+                    control = CONTROL_TRAP;
+                    ostatus = OSTATUS_NONPIPE;
+                    trap_info.exc_code = exc_code_TAG_STORE_FAULT;
+                end
+             end
+         end
+`endif
 
 	 output_stage1.ostatus        = ostatus;
-	 output_stage1.control        = alu_outputs.control;
+	 output_stage1.control        = control;
 	 output_stage1.trap_info      = trap_info;
 	 output_stage1.next_pc        = next_pc;
 	 output_stage1.data_to_stage2 = data_to_stage2;

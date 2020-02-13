@@ -30,6 +30,7 @@ mkCPU_Stage2;
 // ================================================================
 // BSV library imports
 
+import DefaultValue :: *;
 import FIFOF        :: *;
 import GetPut       :: *;
 import ClientServer :: *;
@@ -50,6 +51,8 @@ import TV_Info       :: *;
 import CPU_Globals   :: *;
 import Near_Mem_IFC  :: *;
 import CSR_RegFile   :: *;    // For SATP, SSTATUS, MSTATUS
+import GPR_RegFile   :: *;
+import FPR_RegFile   :: *;
 
 `ifdef SHIFT_SERIAL
 import Shifter_Box  :: *;
@@ -63,6 +66,8 @@ import RISCV_MBox  :: *;
 import FBox_Top    :: *;
 import FBox_Core   :: *;   // For fv_nanbox function
 `endif
+
+import TagMonitor  :: *;
 
 // ================================================================
 // Interface
@@ -91,7 +96,8 @@ endinterface
 
 module mkCPU_Stage2 #(Bit #(4)         verbosity,
 		      CSR_RegFile_IFC  csr_regfile,    // for SATP and SSTATUS: TODO carry in Data_Stage1_to_Stage2
-		      DMem_IFC         dcache)
+		      DMem_IFC         dcache,
+		      TagMonitor#(XLEN, TagT) tagger)
                     (CPU_Stage2_IFC);
 
    FIFOF #(Token) f_reset_reqs <- mkFIFOF;
@@ -105,7 +111,7 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
    // Serial shifter box
 
 `ifdef SHIFT_SERIAL
-   Shifter_Box_IFC shifter_box <- mkShifter_Box;
+   Shifter_Box_IFC shifter_box <- mkShifter_Box(tagger);
 `endif
 
    // ----------------
@@ -128,9 +134,9 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 			     rd:           rg_stage2.rd,
 `ifdef ISA_D
 			     // TODO: is this ifdef necessary? Can't we always truncate?
-			     rd_val:       truncate (rg_stage2.val1)
+			     rd_val:       RegValue { data: truncate (rg_stage2.val1), tag: rg_stage2.tag1 }
 `else
-			     rd_val:       rg_stage2.val1
+			     rd_val:       RegValue { data: rg_stage2.val1, tag: rg_stage2.tag1}
 `endif
 			     };
 
@@ -138,12 +144,12 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
    let fbypass_base = FBypass {bypass_state: BYPASS_RD_NONE,
 			       rd:           rg_stage2.rd,
 `ifdef ISA_D
-			       rd_val:       rg_stage2.val1
+			       rd_val:       RegValueFL { data: rg_stage2.val1, tag: rg_stage2.tag1 }
 `else
 `ifdef RV64
-			       rd_val:       extend (rg_stage2.val1)
+			       rd_val:       RegValueFL { data: extend (rg_stage2.val1), tag: rg_stage2.tag1 }
 `else
-			       rd_val:       rg_stage2.val1
+			       rd_val:       RegValueFL { data: rg_stage2.val1, tag: rg_stage2.tag1 }
 `endif
 `endif
 			       };
@@ -159,7 +165,8 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 `endif
 						    rd_valid:  False,
 						    rd:        rg_stage2.rd,
-						    rd_val:    rg_stage2.val1};
+						    rd_val:    rg_stage2.val1,
+						    rd_tag:    rg_stage2.tag1};
 
    let  trap_info_dmem = Trap_Info {epc:      rg_stage2.pc,
 				    exc_code: dcache.exc_code,
@@ -250,7 +257,7 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 			      : OSTATUS_PIPE));
 
 	    WordXL result = truncate (dcache.word64);
-
+            TagT tag = tagger.unknown_tag(result);
             let funct3 = instr_funct3 (rg_stage2.instr);
 
 	    let data_to_stage3 = data_to_stage3_base;
@@ -283,6 +290,10 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
             // A GPR load in a non-FD system
 	    data_to_stage3.rd_val   = result;
 `endif
+	    data_to_stage3.rd_tag = unpack(extend(funct3)); //tagger.unknown_tag(data_to_stage3.rd_val);
+            if (funct3 == f3_LDST_TAG) begin
+                data_to_stage3.rd_tag = unpack(truncate(dcache.word64));
+	    end
 
             // Update the bypass channel, if not trapping (NONPIPE)
 	    let bypass = bypass_base;
@@ -332,7 +343,7 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 		  // Option 1: longer critical path, since the data is bypassed back into previous stage.
 		  // We use data_to_stage3.rd_val since nanboxing has been done.
 		  bypass.bypass_state = ((ostatus == OSTATUS_PIPE) ? BYPASS_RD_RDVAL : BYPASS_RD);
-		  bypass.rd_val       = result;
+		  bypass.rd_val       = RegValue { data: result, tag: tag };
 
 		  // Option 2: shorter critical path, since the data is not bypassed into previous stage,
 		  // (the bypassing is effectively delayed until the next stage).
@@ -369,6 +380,7 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 	 data_to_stage3.rd_valid = (ostatus == OSTATUS_PIPE);
 	 data_to_stage3.rd       = 0;
 	 data_to_stage3.rd_val   = ?;
+         data_to_stage3.rd_tag = defaultValue;
 
 	 let trace_data   = ?;
 `ifdef INCLUDE_TANDEM_VERIF
@@ -391,6 +403,8 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 	 let ostatus = ((! shifter_box.valid) ? OSTATUS_BUSY : OSTATUS_PIPE);
 
 	 let result = shifter_box.word;
+	 let tag    = shifter_box.tag;
+
 
 	 let data_to_stage3 = data_to_stage3_base;
 	 data_to_stage3.rd_valid = (ostatus == OSTATUS_PIPE);
@@ -399,6 +413,8 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 `else
 	 data_to_stage3.rd_val   = result;
 `endif
+	 data_to_stage3.rd_tag   = tagger.unknown_tag(data_to_stage3.rd_val);
+tag;
 
 	 let bypass = bypass_base;
 	 bypass.bypass_state = ((ostatus == OSTATUS_PIPE) ? BYPASS_RD_RDVAL : BYPASS_RD);
@@ -427,6 +443,7 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 	 let ostatus = ((! mbox.valid) ? OSTATUS_BUSY : OSTATUS_PIPE);
 
 	 let result = mbox.word;
+	 let tag = tagger.default_tag_op(TaggedData { data: ?, tag: defaultValue }, TaggedData { data: ?, tag: defaultValue }, result);
 
 	 let data_to_stage3 = data_to_stage3_base;
 	 data_to_stage3.rd_valid = (ostatus == OSTATUS_PIPE);
@@ -435,10 +452,11 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 `else
 	 data_to_stage3.rd_val   = result;
 `endif
+	 data_to_stage3.rd_tag   = tag;
 
 	 let bypass = bypass_base;
 	 bypass.bypass_state = ((ostatus == OSTATUS_PIPE) ? BYPASS_RD_RDVAL : BYPASS_RD);
-	 bypass.rd_val       = result;
+	 bypass.rd_val       = RegValue { data: result, tag: defaultValue };
 
 	 let trace_data   = ?;
 `ifdef INCLUDE_TANDEM_VERIF
@@ -464,6 +482,7 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 
          // Extract fields from FBOX result
 	 match {.value, .fflags} = fbox.word;
+	 let tag = tagger.default_tag_op(TaggedData { data: ?, tag: defaultValue }, TaggedData { data: ?, tag: defaultValue }, value);
          let upd_fpr             = rg_stage2.rd_in_fpr;
 
 	 let data_to_stage3      = data_to_stage3_base;
@@ -480,9 +499,9 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
             fbypass.bypass_state    = ((ostatus==OSTATUS_PIPE) ? BYPASS_RD_RDVAL
                                                                : BYPASS_RD);
 `ifdef ISA_D
-            fbypass.rd_val          = value;
+            fbypass.rd_val          = RegValueFL { data: value, tag: defaultValue };
 `else
-            fbypass.rd_val          = truncate (value);
+            fbypass.rd_val          = RegValueFL { data: truncate(value), tag: defaultValue };
 `endif
          end
 
@@ -491,9 +510,9 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
             bypass.bypass_state     = ((ostatus==OSTATUS_PIPE) ? BYPASS_RD_RDVAL
                                                                : BYPASS_RD);
 `ifdef RV64
-            bypass.rd_val           = (value);
+            bypass.rd_val           = RegValue { data: value, tag: defaultValue };
 `else
-            bypass.rd_val           = truncate (value);
+            bypass.rd_val           = RegValue { data: truncate(value), tag: defaultValue };
 `endif
          end
 
@@ -528,6 +547,9 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 	 rg_stage2  <= x;
 
 	 let funct3 = instr_funct3 (x.instr);
+	 if (x.op_stage2 == OP_Stage2_LD && funct3 == f3_LDST_TAG) begin
+	    $display("CPU_Stage2 LD tag %h", x.instr);
+	 end
 
 	 // If DMem access, initiate it
 `ifdef ISA_A
@@ -552,8 +574,15 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 	    end
 
 	    CacheOp cache_op = ?;
-	    if      (x.op_stage2 == OP_Stage2_LD)  cache_op = CACHE_LD;
-	    else if (x.op_stage2 == OP_Stage2_ST)  cache_op = CACHE_ST;
+            if      (x.op_stage2 == OP_Stage2_LD) begin
+               cache_op = CACHE_LD;
+            end
+            else if (x.op_stage2 == OP_Stage2_ST) begin
+               cache_op = CACHE_ST;
+               if (funct3 == f3_LDST_TAG) begin
+                  x.val2 = extend(pack(x.tag2));
+                end
+            end
 `ifdef ISA_A
 	    else if (x.op_stage2 == OP_Stage2_AMO) cache_op = CACHE_AMO;
 `endif

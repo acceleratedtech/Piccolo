@@ -399,6 +399,7 @@ Bit #(3) f3_LD  = 3'b011;
 Bit #(3) f3_LBU = 3'b100;
 Bit #(3) f3_LHU = 3'b101;
 Bit #(3) f3_LWU = 3'b110;
+Bit #(3) f3_LDST_TAG = 3'b111;
 
 // ----------------
 // Store instructions
@@ -1097,6 +1098,30 @@ CSR_Addr   csr_addr_hpmcounter28h  = 12'hC9C;    // Upper 32 bits of performance
 CSR_Addr   csr_addr_hpmcounter29h  = 12'hC9D;    // Upper 32 bits of performance-monitoring counter
 CSR_Addr   csr_addr_hpmcounter30h  = 12'hC9E;    // Upper 32 bits of performance-monitoring counter
 CSR_Addr   csr_addr_hpmcounter31h  = 12'hC9F;    // Upper 32 bits of performance-monitoring counter
+
+// <SANCTUM>
+CSR_Addr   csr_addr_mevbase       = 12'h7c0;     // Upper 32 bits of performance-monitoring counter
+CSR_Addr   csr_addr_mevmask       = 12'h7c1;     // Upper 32 bits of performance-monitoring counter
+CSR_Addr   csr_addr_meatp         = 12'h7c2;     // Upper 32 bits of performance-monitoring counter
+CSR_Addr   csr_addr_mmrbm         = 12'h7c3;     // Upper 32 bits of performance-monitoring counter
+CSR_Addr   csr_addr_memrbm        = 12'h7c4;     // Upper 32 bits of performance-monitoring counter
+CSR_Addr   csr_addr_mparbase      = 12'h7c5;     // Upper 32 bits of performance-monitoring counter
+CSR_Addr   csr_addr_mparmask      = 12'h7c6;     // Upper 32 bits of performance-monitoring counter
+CSR_Addr   csr_addr_meparbase     = 12'h7c7;     // Upper 32 bits of performance-monitoring counter
+CSR_Addr   csr_addr_meparmask     = 12'h7c8;     // Upper 32 bits of performance-monitoring counter
+// </SANCTUM>
+
+// <Tagging>
+CSR_Addr   csr_addr_tagctrl       = 12'h802;     // Enable tagging policy
+CSR_Addr   csr_addr_tagscratch0   = 12'h810;     // Tagging policy register 0
+CSR_Addr   csr_addr_tagscratch1   = 12'h811;     // Tagging policy register 1
+CSR_Addr   csr_addr_tagscratch2   = 12'h812;     // Tagging policy register 2
+CSR_Addr   csr_addr_tagscratch3   = 12'h813;     // Tagging policy register 3
+CSR_Addr   csr_addr_tagscratch4   = 12'h814;     // Tagging policy register 4
+CSR_Addr   csr_addr_tagscratch5   = 12'h815;     // Tagging policy register 5
+CSR_Addr   csr_addr_tagscratch6   = 12'h816;     // Tagging policy register 6
+CSR_Addr   csr_addr_tagscratch7   = 12'h817;     // Tagging policy register 7
+// </Tagging>
 
 // Information from the CSR on a new trap. 
 typedef struct {

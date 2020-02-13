@@ -26,6 +26,8 @@ import GetPut       :: *;
 import ClientServer :: *;
 import Connectable  :: *;
 import ConfigReg    :: *;
+import DefaultValue :: *;
+import Vector       :: *;
 
 // ----------------
 // BSV additional libs
@@ -78,6 +80,8 @@ import DM_CPU_Req_Rsp :: *;
 
 // System address map and pc_reset value
 import SoC_Map :: *;
+
+import TagMonitor :: *;
 
 // ================================================================
 // Major States of CPU
@@ -135,6 +139,8 @@ module mkCPU (CPU_IFC);
    let misa     = csr_regfile.read_misa;
    let minstret = csr_regfile.read_csr_minstret;
 
+   TagMonitor#(XLEN, TagT) tagger <- mkTagMonitor(csr_regfile.read_tag_ctrl, csr_regfile.read_tag_scratch);
+
    // Near mem (caches or TCM, for example)
    Near_Mem_IFC  near_mem <- mkNear_Mem;
 
@@ -149,7 +155,7 @@ module mkCPU (CPU_IFC);
    // For debugging
 
    // Verbosity: 0=quiet; 1=instruction trace; 2=more detail
-   Reg #(Bit #(4))  cfg_verbosity <- mkConfigReg (0);
+   Reg #(Bit #(4))  cfg_verbosity <- mkConfigReg (2);
 
    // Verbosity is 0 as long as # of instrs retired is <= cfg_logdelay
    Reg #(Bit #(64))  cfg_logdelay <- mkConfigReg (0);
@@ -194,7 +200,7 @@ module mkCPU (CPU_IFC);
 `endif
 					  csr_regfile);
 
-   CPU_Stage2_IFC stage2 <- mkCPU_Stage2 (cur_verbosity, csr_regfile, near_mem.dmem);
+   CPU_Stage2_IFC stage2 <- mkCPU_Stage2 (cur_verbosity, csr_regfile, near_mem.dmem, tagger);
 
    CPU_Stage1_IFC  stage1 <- mkCPU_Stage1 (cur_verbosity,
 					   gpr_regfile,
@@ -207,7 +213,8 @@ module mkCPU (CPU_IFC);
 `endif
 					   csr_regfile,
 					   imem,
-					   rg_cur_priv);
+					   rg_cur_priv,
+                                           tagger);
 
    // ----------------
    // Interrupt pending based on current priv, mstatus.ie, mie and mip registers
@@ -681,7 +688,10 @@ module mkCPU (CPU_IFC);
 			&& (stage1.out.ostatus == OSTATUS_NONPIPE)
 			&& (stage1.out.control == CONTROL_TRAP)
 			&& (! break_into_Debug_Mode));
-      if (cur_verbosity > 1) $display ("%0d: %m.rl_stage1_trap", mcycle);
+      if (True || cur_verbosity > 1) $display ("%0d: %m.rl_stage1_trap: ", mcycle, fshow(stage1.out.control));
+      $display("trap_info:  ", fshow(stage1.out.trap_info));
+      $display("instr:      ", fshow(stage1.out.data_to_stage2.instr));
+      $display("trace_data: ", fshow(stage1.out.data_to_stage2.trace_data));
 
       // Just save relevant info and handle in next clock
       rg_trap_info       <= stage1.out.trap_info;
@@ -865,7 +875,7 @@ module mkCPU (CPU_IFC);
 
 	 // Writeback to GPR file
 	 let new_rd_val = csr_val;
-	 gpr_regfile.write_rd (rd, new_rd_val);
+	 gpr_regfile.write_rd (rd, RegValue { data: new_rd_val, tag: defaultValue }, False);
 
 	 // Writeback to CSR file
 	 WordXL new_csr_val = ?;
@@ -998,7 +1008,7 @@ module mkCPU (CPU_IFC);
 
 	 // Writeback to GPR file
 	 let new_rd_val = csr_val;
-	 gpr_regfile.write_rd (rd, new_rd_val);
+	 gpr_regfile.write_rd (rd, RegValue { data: new_rd_val, tag: defaultValue }, False);
 
 	 // Writeback to CSR file, but only if rs1 != 0
 	 let x = (  ((funct3 == f3_CSRRS) || (funct3 == f3_CSRRSI))
@@ -1391,7 +1401,7 @@ module mkCPU (CPU_IFC);
 				     && (stage1.out.ostatus == OSTATUS_NONPIPE)
 				     && (stage1.out.control == CONTROL_TRAP)
 				     && break_into_Debug_Mode);
-      if (cur_verbosity > 1) $display ("%0d: %m.rl_trap_BREAK_to_Debug_Mode", mcycle);
+      if (True || cur_verbosity > 1) $display ("%0d: %m.rl_trap_BREAK_to_Debug_Mode", mcycle);
 
       let pc    = stage1.out.data_to_stage2.pc;
       let instr = stage1.out.data_to_stage2.instr;
@@ -1570,7 +1580,7 @@ module mkCPU (CPU_IFC);
       let req <- pop (f_gpr_reqs);
       Bit #(5) regname = req.address;
       let data = gpr_regfile.read_rs1_port2 (regname);
-      let rsp = DM_CPU_Rsp {ok: True, data: data};
+      let rsp = DM_CPU_Rsp {ok: True, data: data.data};
       f_gpr_rsps.enq (rsp);
       if (cur_verbosity > 1)
 	 $display ("%0d: %m.rl_debug_read_gpr: reg %0d => 0x%0h",
@@ -1581,7 +1591,7 @@ module mkCPU (CPU_IFC);
       let req <- pop (f_gpr_reqs);
       Bit #(5) regname = req.address;
       let data = req.data;
-      gpr_regfile.write_rd (regname, data);
+      gpr_regfile.write_rd (regname, RegValue { data: data, tag: defaultValue }, False);
 
       let rsp = DM_CPU_Rsp {ok: True, data: ?};
       f_gpr_rsps.enq (rsp);
@@ -1618,7 +1628,7 @@ module mkCPU (CPU_IFC);
       let req <- pop (f_fpr_reqs);
       Bit #(5) regname = req.address;
       let data = req.data;
-      fpr_regfile.write_rd (regname, data);
+      fpr_regfile.write_rd (regname, RegValueFL { data: data, tag: defaultValue });
 
       let rsp = DM_CPU_Rsp {ok: True, data: ?};
       f_fpr_rsps.enq (rsp);

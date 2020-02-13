@@ -538,7 +538,7 @@ endfunction
 
 // Exception Codes in mcause
 
-typedef Bit #(4) Exc_Code;
+typedef Bit #(5) Exc_Code;
 
 // When Interrupt = 1 (interrupt)
 
@@ -581,6 +581,11 @@ Exc_Code  exc_code_RESERVED_14                   = 14;
 Exc_Code  exc_code_STORE_AMO_PAGE_FAULT          = 15;
 
 
+// Extra exception codes for tagging
+Exc_Code  exc_code_TAG_LOAD_FAULT                = 16;
+Exc_Code  exc_code_TAG_STORE_FAULT               = 17;
+Exc_Code  exc_code_TAG_NEXT_PC_FAULT             = 18;
+
 function Fmt fshow_interrupt_Exc_Code (Exc_Code exc_code);
    return case (exc_code)
 	     exc_code_USER_SW_INTERRUPT:             $format ("USER_SW_INTERRUPT");
@@ -621,6 +626,10 @@ function Fmt fshow_trap_Exc_Code (Exc_Code exc_code);
 	     exc_code_INSTR_PAGE_FAULT:           $format ("INSTRUCTION_PAGE_FAULT");
 	     exc_code_LOAD_PAGE_FAULT:            $format ("LOAD_PAGE_FAULT");
 	     exc_code_STORE_AMO_PAGE_FAULT:       $format ("STORE_AMO_PAGE_FAULT");
+
+             exc_code_INSTR_PAGE_FAULT:           $format ("INSTRUCTION_PAGE_FAULT");
+             exc_code_LOAD_PAGE_FAULT:            $format ("LOAD_PAGE_FAULT");
+             exc_code_STORE_AMO_PAGE_FAULT:       $format ("STORE_AMO_PAGE_FAULT");
 
 	     default:                             $format ("unknown trap Exc_Code %d", exc_code);
 	  endcase;

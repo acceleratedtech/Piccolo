@@ -20,7 +20,9 @@ package CPU_Globals;
 // Project imports
 
 import ISA_Decls :: *;
-
+import GPR_RegFile :: *;
+import FPR_RegFile :: *;
+import TagMonitor  :: *;
 import TV_Info   :: *;
 
 // ================================================================
@@ -40,6 +42,11 @@ typedef enum {OSTATUS_EMPTY,
 deriving (Eq, Bits, FShow);
 
 // ================================================================
+// Branch-prediction info
+
+typedef Bit #(2)  Epoch;
+
+// ================================================================
 // Bypass information
 // From later to earlier stages.
 
@@ -57,7 +64,7 @@ deriving (Eq, Bits, FShow);
 typedef struct {
    Bypass_State  bypass_state;
    RegName       rd;
-   Word          rd_val;
+   RegValue      rd_val;
    } Bypass
 deriving (Bits);
 
@@ -78,7 +85,7 @@ endinstance
 typedef struct {
    Bypass_State  bypass_state;
    RegName       rd;
-   WordFL        rd_val;
+   RegValueFL    rd_val;
    } FBypass
 deriving (Bits);
 
@@ -114,11 +121,11 @@ FBypass no_fbypass = FBypass {bypass_state: BYPASS_RD_NONE,
 // Returns '(busy, val)'
 // 'busy' means that the RegName is valid and matches, but the value is not available yet
 
-function Tuple2 #(Bool, Word) fn_gpr_bypass (Bypass bypass, RegName rd, Word rd_val);
+function Tuple2 #(Bool, RegValue) fn_gpr_bypass (Bypass bypass, RegName rd, RegValue rd_val);
    Bool busy = ((bypass.bypass_state == BYPASS_RD) && (bypass.rd == rd));
-   Word val  = (  ((bypass.bypass_state == BYPASS_RD_RDVAL) && (bypass.rd == rd))
-		? bypass.rd_val
-		: rd_val);
+   RegValue val  = (  ((bypass.bypass_state == BYPASS_RD_RDVAL) && (bypass.rd == rd))
+                   ? bypass.rd_val
+                   : rd_val);
    return tuple2 (busy, val);
 endfunction
 
@@ -126,11 +133,11 @@ endfunction
 // FBypass functions for FPRs
 // Returns '(busy, val)'
 // 'busy' means that the RegName is valid and matches, but the value is not available yet
-function Tuple2 #(Bool, WordFL) fn_fpr_bypass (FBypass bypass, RegName rd, WordFL rd_val);
+function Tuple2 #(Bool, RegValueFL) fn_fpr_bypass (FBypass bypass, RegName rd, RegValueFL rd_val);
    Bool busy = ((bypass.bypass_state == BYPASS_RD) && (bypass.rd == rd));
-   WordFL val= (  ((bypass.bypass_state == BYPASS_RD_RDVAL) && (bypass.rd == rd))
-		? bypass.rd_val
-		: rd_val);
+   RegValueFL val= (  ((bypass.bypass_state == BYPASS_RD_RDVAL) && (bypass.rd == rd))
+                   ? bypass.rd_val
+                   : rd_val);
    return tuple2 (busy, val);
 endfunction
 `endif
@@ -146,10 +153,127 @@ typedef struct {
 deriving (Bits, FShow);
 
 // ================================================================
+// Output from Stage F
+
+typedef struct {
+   Stage_OStatus          ostatus;
+
+   // feedforward data
+   Data_StageF_to_StageD  data_to_stageD;
+   } Output_StageF
+deriving (Bits);
+
+instance FShow #(Output_StageF);
+   function Fmt fshow (Output_StageF x);
+      Fmt fmt = $format ("Output_StageF");
+      if (x.ostatus == OSTATUS_EMPTY)
+	 fmt = fmt + $format (" EMPTY");
+      else if (x.ostatus == OSTATUS_BUSY)
+	 fmt = fmt + $format (" BUSY: pc:%h", x.data_to_stageD.pc);
+      else if (x.ostatus == OSTATUS_NONPIPE)
+	 fmt = fmt + $format (" NONPIPE: pc:%h [***** IMPOSSIBLE! *****]", x.data_to_stageD.pc);
+      else
+	 fmt = fmt + $format (" PIPE: ", fshow (x.data_to_stageD));
+      return fmt;
+   endfunction
+endinstance
+// ----------------
+// Data_StageF_to_StageD
+
+typedef struct {
+   Addr       pc;
+   Epoch      epoch;              // Branch prediction epoch
+   Priv_Mode  priv;               // Priv at which instr was fetched
+   Bool       is_i32_not_i16;     // True if a regular 32b instr, not a compressed (16b) instr
+   Bool       exc;                // True if exc in icache access
+   Exc_Code   exc_code;
+   WordXL     tval;               // Trap value; can be different from PC, with 'C' extension
+   Instr      instr;              // Valid if no exception
+   WordXL     pred_pc;            // Predicted next pc
+   } Data_StageF_to_StageD
+deriving (Bits);
+
+instance FShow #(Data_StageF_to_StageD);
+   function Fmt fshow (Data_StageF_to_StageD x);
+      Fmt fmt = $format ("data_to_StageD {pc:%h  priv:%0d  epoch:%0d", x.pc, x.priv, x.epoch);
+      if (x.exc)
+	 fmt = fmt + $format ("  ", fshow_trap_Exc_Code (x.exc_code));
+      else
+	 fmt = fmt + $format ("  instr:%h  pred_pc:%h", x.instr, x.pred_pc);
+      fmt = fmt + $format ("}");
+      return fmt;
+   endfunction
+endinstance
+
+// ================================================================
+// Output from Stage D
+// Just adds decoded instr info
+
+typedef struct {
+   Stage_OStatus          ostatus;
+
+   // feedforward data
+   Data_StageD_to_Stage1  data_to_stage1;
+   } Output_StageD
+deriving (Bits);
+
+instance FShow #(Output_StageD);
+   function Fmt fshow (Output_StageD x);
+      Fmt fmt = $format ("Output_StageD");
+      if (x.ostatus == OSTATUS_EMPTY)
+	 fmt = fmt + $format (" EMPTY");
+      else if (x.ostatus == OSTATUS_BUSY)
+	 fmt = fmt + $format (" BUSY: pc:%h", x.data_to_stage1.pc);
+      else if (x.ostatus == OSTATUS_NONPIPE)
+	 fmt = fmt + $format (" NONPIPE: pc:%h [***** IMPOSSIBLE! *****]", x.data_to_stage1.pc);
+      else
+	 fmt = fmt + $format (" PIPE: ", fshow (x.data_to_stage1));
+      return fmt;
+   endfunction
+endinstance
+
+// ----------------
+// Data_StageD_to_Stage1
+
+typedef struct {
+   Addr           pc;
+   Priv_Mode      priv;               // Priv at which instr was fetched
+   Epoch          epoch;              // Branch prediction epoch
+
+   Bool           is_i32_not_i16;     // True if a regular 32b instr, not a compressed (16b) instr
+
+   Bool           exc;                // True if exc in icache access
+   Exc_Code       exc_code;
+   WordXL         tval;               // Trap value; can be different from PC, with 'C' extension
+
+   Instr          instr;              // Valid if no exception
+   Instr_C        instr_C;            // Valid if no exception; original compressed instruction
+   WordXL         pred_pc;            // Predicted next pc
+   Decoded_Instr  decoded_instr;
+   } Data_StageD_to_Stage1
+deriving (Bits);
+
+instance FShow #(Data_StageD_to_Stage1);
+   function Fmt fshow (Data_StageD_to_Stage1 x);
+      Fmt fmt = $format ("data_to_Stage1 {pc:%0h  priv:%0d  epoch:%0d", x.pc, x.priv, x.epoch);
+      if (x.exc)
+	 fmt = fmt + $format ("  ", fshow_trap_Exc_Code (x.exc_code), " tval %0h", x.tval);
+      else begin
+	 if (x.is_i32_not_i16)
+	    fmt = fmt + $format ("  instr_C:%0h", x.instr_C);
+	 fmt = fmt + $format ("  instr:%0h  pred_pc:%0h", x.instr, x.pred_pc);
+      end
+      fmt = fmt + $format ("}");
+      return fmt;
+   endfunction
+endinstance
+
+// ================================================================
 // Output from Stage 1
 
 // Outputs from Stage1 to pipeline control
-typedef enum {  CONTROL_STRAIGHT
+typedef enum {  CONTROL_DISCARD
+	      , CONTROL_STRAIGHT
 	      , CONTROL_BRANCH
 	      , CONTROL_CSRR_W
 	      , CONTROL_CSRR_S_or_C
@@ -172,6 +296,7 @@ typedef struct {
    Trap_Info              trap_info;
 
    // feedback
+   Bool                   redirect;
    WordXL                 next_pc;
 
    // feedforward data
@@ -195,7 +320,8 @@ instance FShow #(Output_Stage1);
 	 else
 	    fmt = fmt + $format (" PIPE: ", fshow (x.control), " ", fshow (x.data_to_stage2));
 
-	 fmt = fmt + $format (" next_pc 0x%08h", x.next_pc);
+	 if (x.redirect)
+	    fmt = fmt + $format ("\n        redirect next_pc:%h", x.next_pc);
       end
       return fmt;
    endfunction
@@ -242,6 +368,7 @@ typedef struct {
    RegName    rd;
    Addr       addr;     // Branch, jump: newPC
                         // Mem ops and AMOs: mem addr
+   TagT       addr_tag;
 `ifdef ISA_D
    // When D is enabled, the val from Stage1 to Stage2 should be sized to
    // max (sizeOf (WordXL), sizeOf (WordFL))
@@ -259,9 +386,12 @@ typedef struct {
    WordXL     val2;     // OP_Stage2_ST: store-val;
                         // OP_Stage2_M and OP_Stage2_FD: arg2
 `endif
+   TagT       tag1;
+   TagT       tag2;
 
 `ifdef ISA_F
    WordFL     val3;     // OP_Stage2_FD: arg3
+   TagT       tag3;
    Bool       rd_in_fpr;// The rd should update into FPR
    Bit #(3)   rounding_mode;    // rounding mode from fcsr_frm or instr.rm
 `endif
@@ -349,6 +479,7 @@ typedef struct {
 `else
    WordXL    rd_val;
 `endif
+   TagT      rd_tag;
    } Data_Stage2_to_Stage3
 deriving (Bits);
 

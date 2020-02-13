@@ -98,10 +98,10 @@ module mkCPU_Stage3 #(Bit #(4)         verbosity,
 			     rd:           rg_stage3.rd,
 `ifdef ISA_D
 			     // WordXL        WordFL (64)
-			     rd_val:       truncate (rg_stage3.rd_val)
+			     rd_val:       RegValue { data: truncate (rg_stage3.rd_val), tag: rg_stage3.rd_tag }
 `else
 			     // WordXL        WordXL
-			     rd_val:       rg_stage3.rd_val
+			     rd_val:       RegValue { data: rg_stage3.rd_val, tag: rg_stage3.rd_tag }
 `endif
 			     };
 
@@ -109,15 +109,15 @@ module mkCPU_Stage3 #(Bit #(4)         verbosity,
    let fbypass_base = FBypass {bypass_state: BYPASS_RD_NONE,
 			       rd:           rg_stage3.rd,
 `ifdef ISA_D
-			       // WordFL        WordFL
-			       rd_val:       rg_stage3.rd_val
+			       // RegValueFL  WordFL
+			       rd_val:       RegValueFL { data: rg_stage3.rd_val, tag: rg_stage3.rd_tag }
 `else
 `ifdef RV64
 			       // WordFL (32)   WordXL (64)
-			       rd_val:       truncate (rg_stage3.rd_val)
+			       rd_val:       RegValueFL { data: truncate (rg_stage3.rd_val.data), tag: rg_stage3.rd_tag }
 `else
 			       // WordFL (32)   WordXL (32)
-			       rd_val:       rg_stage3.rd_val
+			       rd_val:       RegValueFL { data: rg_stage3.rd_val.data, tag: rg_stage3.rd_tag }
 `endif
 `endif
 			       };
@@ -151,6 +151,11 @@ module mkCPU_Stage3 #(Bit #(4)         verbosity,
                                                             : BYPASS_RD_NONE;
 `endif
 
+      Bool is_ld_tag_inst = (rg_stage3.instr[6:0] == op_LOAD) && (rg_stage3.instr[14:12] == f3_LDST_TAG);
+      if (is_ld_tag_inst) begin
+         bypass.bypass_state = rg_full ? BYPASS_RD : BYPASS_RD_NONE;
+      end
+
       return Output_Stage3 {ostatus: (rg_full ? OSTATUS_PIPE : OSTATUS_EMPTY),
 			    bypass : bypass
 `ifdef ISA_F
@@ -166,25 +171,26 @@ module mkCPU_Stage3 #(Bit #(4)         verbosity,
       action
 	 // Writeback Rd if valid
 	 if (rg_stage3.rd_valid) begin
+            Bool is_ld_tag_inst = (rg_stage3.instr[6:0] == op_LOAD) && (rg_stage3.instr[14:12] == f3_LDST_TAG);
 `ifdef ISA_F
             // Write to FPR
             if (rg_stage3.rd_in_fpr)
 `ifdef ISA_D
-               fpr_regfile.write_rd (rg_stage3.rd, rg_stage3.rd_val);
+               fpr_regfile.write_rd (rg_stage3.rd, RegValueFL { data: rg_stage3.rd_val, tag: rg_stage3.rd_tag });
 `else
-               fpr_regfile.write_rd (rg_stage3.rd, truncate (rg_stage3.rd_val));
+               fpr_regfile.write_rd (rg_stage3.rd, RegValueFL { data: truncate (rg_stage3.rd_val), tag: rg_stage3.rd_tag });
 `endif
             // Write to GPR in a FD system
             else
 `ifdef RV64
-               gpr_regfile.write_rd (rg_stage3.rd, rg_stage3.rd_val);
+               gpr_regfile.write_rd (rg_stage3.rd, RegValue { data: rg_stage3.rd_val, tag: rg_stage3.rd_tag }, is_ld_tag_inst);
 `endif
 `ifdef RV32
-               gpr_regfile.write_rd (rg_stage3.rd, truncate (rg_stage3.rd_val));
+               gpr_regfile.write_rd (rg_stage3.rd, RegValue { data: truncate (rg_stage3.rd_val), tag: rg_stage3.rd_tag }, is_ld_tag_inst);
 `endif
 `else
             // Write to GPR in a non-FD system
-            gpr_regfile.write_rd (rg_stage3.rd, rg_stage3.rd_val);
+            gpr_regfile.write_rd (rg_stage3.rd, RegValue { data: rg_stage3.rd_val, tag: rg_stage3.rd_tag }, is_ld_tag_inst);
 `endif
 
 	    if (verbosity > 1)

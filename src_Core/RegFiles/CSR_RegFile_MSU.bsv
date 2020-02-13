@@ -15,6 +15,7 @@ export  CSR_RegFile_IFC (..),  mkCSR_RegFile;
 // ================================================================
 // BSV library imports
 
+import BuildVector  :: *;
 import ConfigReg    :: *;
 import RegFile      :: *;
 import Vector       :: *;
@@ -97,6 +98,11 @@ interface CSR_RegFile_IFC;
    // Read SATP
    (* always_ready *)
    method WordXL read_satp;
+
+   // <Tagging>
+   method WordXL read_tag_ctrl;
+   method Vector#(8, WordXL) read_tag_scratch;
+   // </Tagging>
 
    // CSR trap actions
    method ActionValue #(Trap_Info)
@@ -357,6 +363,18 @@ module mkCSR_RegFile (CSR_RegFile_IFC);
    Reg #(Bool)    rg_nmi <- mkReg (False);
    Reg #(WordXL)  rg_nmi_vector <- mkRegU;
 
+    // <Tagging>
+    Reg#(WordXL) rg_tagctrl <- mkReg(0);
+    Reg#(WordXL) rg_tagscratch0 <- mkReg(0);
+    Reg#(WordXL) rg_tagscratch1 <- mkReg(0);
+    Reg#(WordXL) rg_tagscratch2 <- mkReg(0);
+    Reg#(WordXL) rg_tagscratch3 <- mkReg(0);
+    Reg#(WordXL) rg_tagscratch4 <- mkReg(0);
+    Reg#(WordXL) rg_tagscratch5 <- mkReg(0);
+    Reg#(WordXL) rg_tagscratch6 <- mkReg(0);
+    Reg#(WordXL) rg_tagscratch7 <- mkReg(0);
+    // </Tagging>
+
    // ----------------------------------------------------------------
    // Reset.
    // Initialize some CSRs.
@@ -419,6 +437,18 @@ module mkCSR_RegFile (CSR_RegFile_IFC);
       rg_nmi_vector <= truncate (soc_map.m_nmivec_reset_value);
 
       rg_state <= RF_RUNNING;
+
+      // <Tagging>
+      rg_tagctrl <= 0;
+      rg_tagscratch0 <= 0;
+      rg_tagscratch1 <= 0;
+      rg_tagscratch2 <= 0;
+      rg_tagscratch3 <= 0;
+      rg_tagscratch4 <= 0;
+      rg_tagscratch5 <= 0;
+      rg_tagscratch6 <= 0;
+      rg_tagscratch7 <= 0;
+      // </Tagging>
    endrule
 
    // ----------------------------------------------------------------
@@ -569,6 +599,17 @@ module mkCSR_RegFile (CSR_RegFile_IFC);
 		     || (csr_addr == csr_addr_dscratch0)
 		     || (csr_addr == csr_addr_dscratch1)
 `endif
+                     // <TAGGING>
+                     || (csr_addr == csr_addr_tagctrl)
+                     || (csr_addr == csr_addr_tagscratch0)
+                     || (csr_addr == csr_addr_tagscratch1)
+                     || (csr_addr == csr_addr_tagscratch2)
+                     || (csr_addr == csr_addr_tagscratch3)
+                     || (csr_addr == csr_addr_tagscratch4)
+                     || (csr_addr == csr_addr_tagscratch5)
+                     || (csr_addr == csr_addr_tagscratch6)
+                     || (csr_addr == csr_addr_tagscratch7)
+                     // </TAGGING>
 	 );
       return result;
    endfunction: fv_csr_exists
@@ -658,6 +699,18 @@ module mkCSR_RegFile (CSR_RegFile_IFC);
 	    csr_addr_mcause:     m_csr_value = tagged Valid (mcause_to_word (rg_mcause));
 	    csr_addr_mtval:      m_csr_value = tagged Valid rg_mtval;
 	    csr_addr_mip:        m_csr_value = tagged Valid (csr_mip.fv_read);
+
+	    // <Tagging>
+	    csr_addr_tagctrl: m_csr_value = tagged Valid rg_tagctrl;
+	    csr_addr_tagscratch0: m_csr_value = tagged Valid rg_tagscratch0;
+	    csr_addr_tagscratch1: m_csr_value = tagged Valid rg_tagscratch1;
+	    csr_addr_tagscratch2: m_csr_value = tagged Valid rg_tagscratch2;
+	    csr_addr_tagscratch3: m_csr_value = tagged Valid rg_tagscratch3;
+	    csr_addr_tagscratch4: m_csr_value = tagged Valid rg_tagscratch4;
+	    csr_addr_tagscratch5: m_csr_value = tagged Valid rg_tagscratch5;
+	    csr_addr_tagscratch6: m_csr_value = tagged Valid rg_tagscratch6;
+	    csr_addr_tagscratch7: m_csr_value = tagged Valid rg_tagscratch7;
+	    // </Tagging>
 
 	    // Note: Phys Mem Protection CSRs (pmpcfg and pmpaddr) are done elsewhere
 
@@ -804,6 +857,54 @@ module mkCSR_RegFile (CSR_RegFile_IFC);
 				       rg_mideleg <= truncate (result);
 				    end
 `endif
+
+               // <Tagging>
+	       csr_addr_tagctrl:    begin
+	                               result   = wordxl;
+				       rg_tagctrl <= result;
+				       $display("Updating tagctrl: %h", result);
+				    end
+               csr_addr_tagscratch0: begin
+	                                 result   = wordxl;
+					 rg_tagscratch0 <= result;
+					 $display("Updating tagscratch0: %h", result);
+			             end
+               csr_addr_tagscratch1: begin
+	                                 result   = wordxl;
+					 rg_tagscratch1 <= result;
+					 $display("Updating tagscratch1: %h", result);
+			             end
+               csr_addr_tagscratch2: begin
+	                                 result   = wordxl;
+					 rg_tagscratch2 <= result;
+					 $display("Updating tagscratch2: %h", result);
+			             end
+               csr_addr_tagscratch3: begin
+	                                 result   = wordxl;
+					 rg_tagscratch3 <= result;
+					 $display("Updating tagscratch3: %h", result);
+			             end
+               csr_addr_tagscratch4: begin
+	                                 result   = wordxl;
+					 rg_tagscratch4 <= result;
+					 $display("Updating tagscratch4: %h", result);
+			             end
+               csr_addr_tagscratch5: begin
+	                                 result   = wordxl;
+					 rg_tagscratch5 <= result;
+					 $display("Updating tagscratch5: %h", result);
+			             end
+               csr_addr_tagscratch6: begin
+	                                 result   = wordxl;
+					 rg_tagscratch6 <= result;
+					 $display("Updating tagscratch6: %h", result);
+			             end
+               csr_addr_tagscratch7: begin
+	                                 result   = wordxl;
+					 rg_tagscratch7 <= result;
+					 $display("Updating tagscratch7: %h", result);
+			             end
+               // </Tagging>
 
 	       // Machine mode
 	       csr_addr_mvendorid:  result = mvendorid;    // hardwired
@@ -1083,6 +1184,22 @@ module mkCSR_RegFile (CSR_RegFile_IFC);
       return  ?;
 `endif
    endmethod
+
+   // <Tagging>
+   method WordXL read_tag_ctrl;
+      return rg_tagctrl;
+   endmethod
+   method Vector#(8, WordXL) read_tag_scratch;
+      return vec(rg_tagscratch0,
+                 rg_tagscratch1,
+                 rg_tagscratch2,
+                 rg_tagscratch3,
+                 rg_tagscratch4,
+                 rg_tagscratch5,
+                 rg_tagscratch6,
+                 rg_tagscratch7);
+   endmethod
+   // </Tagging>
 
    // CSR Trap actions
    method ActionValue #(Trap_Info)
