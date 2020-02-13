@@ -2444,6 +2444,10 @@
         <spirit:userFileType>CHECKSUM_92bc5a82</spirit:userFileType>
       </spirit:file>
       <spirit:file>
+        <spirit:name>hdl/mkPMPU.v</spirit:name>
+        <spirit:fileType>verilogSource</spirit:fileType>
+      </spirit:file>
+      <spirit:file>
         <spirit:name>hdl/mkDM_GPR_Tap.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
         <spirit:logicalName>xil_defaultlib</spirit:logicalName>
