@@ -152,12 +152,11 @@ module mkGPR_RegFile (GPR_RegFile_IFC);
    // GPR write
    method Action write_rd (RegName rd, RegValue rd_val, Bool write_tag_only);
        if (rd != 0) begin
-           let old_data = regfile_data.sub(rd);
            if (!write_tag_only) begin
                regfile_data.upd (rd, rd_val.data);
            end
 	   else begin
-               $display("Loading register", fshow(rd), " data ", fshow(rd_val.data), " tag ", fshow(rd_val.tag), " old data ", fshow(old_data));
+               $display("Load tag", fshow(rd), " data ", fshow(rd_val.data), " tag ", fshow(rd_val.tag));
            end
            regfile_tag.upd (rd, rd_val.tag);
        end
