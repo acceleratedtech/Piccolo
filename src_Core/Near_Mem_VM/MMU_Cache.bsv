@@ -213,7 +213,12 @@ function Bool fn_is_aligned (Bit #(3) f3, Bit #(n) addr);
    return (    (f3 [1:0] == 2'b00)                                // B, BU
 	   || ((f3 [1:0] == 2'b01) && (addr [0] == 1'b0))         // H, HU
 	   || ((f3 [1:0] == 2'b10) && (addr [1:0] == 2'b00))      // W, WU
+`ifdef RV32
+	   || ((f3 [1:0] == 2'b10) && (addr [2:0] == 3'b000))     // D (but this is not legal RV32 instruction?
+	   || ((f3 [2:0] == 3'b111) && (addr [1:0] == 2'b00))     // TAG (32 bits)
+`else
 	   || ((f3 [1:0] == 2'b11) && (addr [2:0] == 3'b000))     // D
+`endif
 	   );
 endfunction
 
