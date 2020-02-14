@@ -231,6 +231,9 @@ function AXI4_Size fn_funct3_to_AXI4_Size (Bit #(3) funct3);
    if      (x == f3_SIZE_B)        result = axsize_1;
    else if (x == f3_SIZE_H)        result = axsize_2;
    else if (x == f3_SIZE_W)        result = axsize_4;
+`ifdef RV32
+   else if (funct3 == f3_LDST_TAG) result = axsize_4;
+`endif
    else /* if (x == f3_SIZE_D) */  result = axsize_8;
    return result;
 endfunction
