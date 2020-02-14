@@ -74,7 +74,7 @@ instance FShow #(Bypass);
       let fmt1 = ((x.bypass_state == BYPASS_RD_NONE)
 		  ? $format ("Rd -")
 		  : $format ("Rd %0d ", x.rd) + ((x.bypass_state == BYPASS_RD)
-						 ? $format ("-")
+						 ? $format ("busy")
 						 : $format ("rd_val:%h", x.rd_val)));
       let fmt2 = $format ("}");
       return fmt0 + fmt1 + fmt2;
@@ -95,7 +95,7 @@ instance FShow #(FBypass);
       let fmt1 = ((x.bypass_state == BYPASS_RD_NONE)
 		  ? $format ("FRd -")
 		  : $format ("FRd %0d ", x.rd) + ((x.bypass_state == BYPASS_RD)
-						 ? $format ("-")
+						 ? $format ("busy")
 						 : $format ("frd_val:%h", x.rd_val)));
       let fmt2 = $format ("}");
       return fmt0 + fmt1 + fmt2;
@@ -322,6 +322,7 @@ instance FShow #(Output_Stage1);
 
 	 if (x.redirect)
 	    fmt = fmt + $format ("\n        redirect next_pc:%h", x.next_pc);
+         fmt = fmt + $format ("\n        to stage2: ", fshow (x.data_to_stage2));
       end
       return fmt;
    endfunction
