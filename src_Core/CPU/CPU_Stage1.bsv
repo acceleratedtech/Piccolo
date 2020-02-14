@@ -280,7 +280,7 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
 			? alu_outputs.addr_tag
 			: fall_through_pc_tag);
 
-         // FIXME: Check for tagging policy exceptions
+         // Check for tagging policy exceptions
          let control = alu_outputs.control;
          if (!tagger.is_legal_next_pc(TaggedData {data: next_pc, tag: next_pc_tag})) begin
             // illegal next pc according to tagging policy

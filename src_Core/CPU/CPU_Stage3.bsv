@@ -186,9 +186,15 @@ module mkCPU_Stage3 #(Bit #(4)         verbosity,
                gpr_regfile.write_rd (rg_stage3.rd, RegValue { data: rg_stage3.rd_val, tag: rg_stage3.rd_tag }, is_ld_tag_inst);
 `endif
 `ifdef RV32
+       if (is_ld_tag_inst) begin
+           $display("load tag rd_val %h", rg_stage3.rd_tag);
+       end
                gpr_regfile.write_rd (rg_stage3.rd, RegValue { data: truncate (rg_stage3.rd_val), tag: rg_stage3.rd_tag }, is_ld_tag_inst);
 `endif
 `else
+       if (is_ld_tag_inst) begin
+           $display("load tag rd_val %h non-FD", rg_stage3.rd_tag);
+       end
             // Write to GPR in a non-FD system
             gpr_regfile.write_rd (rg_stage3.rd, RegValue { data: rg_stage3.rd_val, tag: rg_stage3.rd_tag }, is_ld_tag_inst);
 `endif
@@ -200,8 +206,8 @@ module mkCPU_Stage3 #(Bit #(4)         verbosity,
                             rg_stage3.rd, rg_stage3.rd_val);
                else
 `endif
-                  $display ("    S3.fa_deq: write GRd 0x%0h, rd_val 0x%0h",
-                            rg_stage3.rd, rg_stage3.rd_val);
+                  $display ("    S3.fa_deq: write GRd 0x%0h, rd_val 0x%0h ldst %d",
+                            rg_stage3.rd, rg_stage3.rd_val, is_ld_tag_inst);
 
 `ifdef ISA_F
             // Update FCSR.fflags

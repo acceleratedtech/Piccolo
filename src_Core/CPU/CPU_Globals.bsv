@@ -322,7 +322,6 @@ instance FShow #(Output_Stage1);
 
 	 if (x.redirect)
 	    fmt = fmt + $format ("\n        redirect next_pc:%h", x.next_pc);
-         fmt = fmt + $format ("\n        to stage2: ", fshow (x.data_to_stage2));
       end
       return fmt;
    endfunction

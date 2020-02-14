@@ -285,7 +285,7 @@ module mkCPU (CPU_IFC);
 
    function fa_emit_instr_trace (instret, pc, instr, priv);
       action
-	 if (cur_verbosity == 1)
+	 if (cur_verbosity >= 1)
 	    $display ("instret:%0d  PC:0x%0h  instr:0x%0h  priv:%0d", instret, pc, instr, priv);
       endaction
    endfunction
@@ -348,7 +348,6 @@ module mkCPU (CPU_IFC);
 
 	 fa_start_ifetch (resume_pc, rg_cur_priv, mstatus_MXR, sstatus_SUM);
 	 stage1.set_full (True);
-
 	 stage2.set_full (False);
 	 stage3.set_full (False);
 

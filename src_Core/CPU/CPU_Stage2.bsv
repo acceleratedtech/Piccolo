@@ -136,7 +136,7 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 			     // TODO: is this ifdef necessary? Can't we always truncate?
 			     rd_val:       RegValue { data: truncate (rg_stage2.val1), tag: rg_stage2.tag1 }
 `else
-			     rd_val:       RegValue { data: rg_stage2.val1, tag: rg_stage2.tag1}
+			     rd_val:       RegValue { data: rg_stage2.val1, tag: rg_stage2.tag1 }
 `endif
 			     };
 
@@ -144,12 +144,12 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
    let fbypass_base = FBypass {bypass_state: BYPASS_RD_NONE,
 			       rd:           rg_stage2.rd,
 `ifdef ISA_D
-			       rd_val:       RegValueFL { data: rg_stage2.val1, tag: rg_stage2.tag1 }
+			       rd_val:       RegValueFL { data: rg_stage2.val1,          tag: rg_stage2.tag1 }
 `else
 `ifdef RV64
 			       rd_val:       RegValueFL { data: extend (rg_stage2.val1), tag: rg_stage2.tag1 }
 `else
-			       rd_val:       RegValueFL { data: rg_stage2.val1, tag: rg_stage2.tag1 }
+			       rd_val:       RegValueFL { data: rg_stage2.val1,          tag: rg_stage2.tag1 }
 `endif
 `endif
 			       };
@@ -257,7 +257,7 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 			      : OSTATUS_PIPE));
 
 	    WordXL result = truncate (dcache.word64);
-            TagT tag = tagger.unknown_tag(result);
+
             let funct3 = instr_funct3 (rg_stage2.instr);
 
 	    let data_to_stage3 = data_to_stage3_base;
@@ -269,13 +269,17 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
                if (funct3 == f3_FLW)
 `ifdef ISA_D
                   // needs nan-boxing when destined for a DP register file
-                  data_to_stage3.rd_val = fv_nanbox (dcache.word64);
+                  result = fv_nanbox (dcache.word64);
+                  data_to_stage3.rd_val = result;
 `else
                   data_to_stage3.rd_val = result;
 `endif
                // A FLD result
-               else
+               end
+	       else begin
                   data_to_stage3.rd_val = dcache.word64;
+               end
+
             end
 
             // A GPR load in a FD system
@@ -290,8 +294,9 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
             // A GPR load in a non-FD system
 	    data_to_stage3.rd_val   = result;
 `endif
-	    data_to_stage3.rd_tag = unpack(extend(funct3)); //tagger.unknown_tag(data_to_stage3.rd_val);
+	    data_to_stage3.rd_tag = tagger.unknown_tag(data_to_stage3.rd_val);
             if (funct3 == f3_LDST_TAG) begin
+                //FIXME funct3
                 data_to_stage3.rd_tag = unpack(truncate(dcache.word64));
 	    end
 
@@ -343,7 +348,7 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 		  // Option 1: longer critical path, since the data is bypassed back into previous stage.
 		  // We use data_to_stage3.rd_val since nanboxing has been done.
 		  bypass.bypass_state = ((ostatus == OSTATUS_PIPE) ? BYPASS_RD_RDVAL : BYPASS_RD);
-		  bypass.rd_val       = RegValue { data: result, tag: tag };
+		  bypass.rd_val       = RegValue { data: result, tag: data_to_stage3.rd_tag };
 
 		  // Option 2: shorter critical path, since the data is not bypassed into previous stage,
 		  // (the bypassing is effectively delayed until the next stage).
@@ -405,7 +410,6 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 	 let result = shifter_box.word;
 	 let tag    = shifter_box.tag;
 
-
 	 let data_to_stage3 = data_to_stage3_base;
 	 data_to_stage3.rd_valid = (ostatus == OSTATUS_PIPE);
 `ifdef ISA_D
@@ -413,8 +417,7 @@ module mkCPU_Stage2 #(Bit #(4)         verbosity,
 `else
 	 data_to_stage3.rd_val   = result;
 `endif
-	 data_to_stage3.rd_tag   = tagger.unknown_tag(data_to_stage3.rd_val);
-tag;
+	 data_to_stage3.rd_tag   = tag;
 
 	 let bypass = bypass_base;
 	 bypass.bypass_state = ((ostatus == OSTATUS_PIPE) ? BYPASS_RD_RDVAL : BYPASS_RD);
@@ -483,6 +486,7 @@ tag;
          // Extract fields from FBOX result
 	 match {.value, .fflags} = fbox.word;
 	 let tag = tagger.default_tag_op(TaggedData { data: ?, tag: defaultValue }, TaggedData { data: ?, tag: defaultValue }, value);
+
          let upd_fpr             = rg_stage2.rd_in_fpr;
 
 	 let data_to_stage3      = data_to_stage3_base;
@@ -512,7 +516,7 @@ tag;
 `ifdef RV64
             bypass.rd_val           = RegValue { data: value, tag: defaultValue };
 `else
-            bypass.rd_val           = RegValue { data: truncate(value), tag: defaultValue };
+            bypass.rd_val           = RegValue { data: truncate (value), tag: defaultValue };
 `endif
          end
 

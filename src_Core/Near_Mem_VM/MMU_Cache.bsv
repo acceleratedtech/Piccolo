@@ -438,7 +438,7 @@ module mkMMU_Cache  #(parameter Bool dmem_not_imem)  (MMU_Cache_IFC);
    String d_or_i = (dmem_not_imem ? "D_MMU_Cache" : "I_MMU_Cache");
 
    // Verbosity: 0: quiet; 1 reset info; 2: + detail; 3: cache refill loop detail
-   Integer verbosity = (dmem_not_imem ? 0 : 0);
+   Integer verbosity = (dmem_not_imem ? 2 : 2);
    Reg #(Bit #(4)) cfg_verbosity <- mkConfigReg (fromInteger (verbosity));
 
    // Overall state of this module
@@ -1758,6 +1758,7 @@ module mkMMU_Cache  #(parameter Bool dmem_not_imem)  (MMU_Cache_IFC);
       else begin
 	 rg_state    <= MODULE_EXCEPTION_RSP;
 	 rg_exc_code <= exc_code_LOAD_ACCESS_FAULT;
+	 $display("==== MMU_CACHE: load access fault vaddr %h paddr %h", rg_addr, rg_pa);
 	 if (cfg_verbosity > 1)
 	    $display ("%0d: %s.rl_io_read_rsp: FABRIC_RSP_ERR: raising trap LOAD_ACCESS_FAULT",
 		      cur_cycle, d_or_i);
@@ -1983,6 +1984,7 @@ module mkMMU_Cache  #(parameter Bool dmem_not_imem)  (MMU_Cache_IFC);
 
       if (! fn_is_aligned (f3, addr)) begin
 	 // We detect misaligned accesses and trap on them
+	 $display("==== MMU_CACHE: misaligned f3 %h addr %h", f3, addr);
 	 rg_state    <= MODULE_EXCEPTION_RSP;
 	 rg_exc_code <= ((op == CACHE_LD) ? exc_code_LOAD_ADDR_MISALIGNED : exc_code_STORE_AMO_ADDR_MISALIGNED);
       end
