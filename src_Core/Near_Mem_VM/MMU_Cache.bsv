@@ -226,14 +226,11 @@ endfunction
 // Convert RISC-V funct3 code into AXI4_Size code (number of bytes in a beat)
 
 function AXI4_Size fn_funct3_to_AXI4_Size (Bit #(3) funct3);
-   Bit #(2)   x = funct3 [1:0];
+   Bit #(2)   x = fn_f3_width(funct3) [1:0];
    AXI4_Size  result;
    if      (x == f3_SIZE_B)        result = axsize_1;
    else if (x == f3_SIZE_H)        result = axsize_2;
    else if (x == f3_SIZE_W)        result = axsize_4;
-`ifdef RV32
-   else if (funct3 == f3_LDST_TAG) result = axsize_4;
-`endif
    else /* if (x == f3_SIZE_D) */  result = axsize_8;
    return result;
 endfunction
