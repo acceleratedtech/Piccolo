@@ -174,7 +174,6 @@ module mkNear_Mem (Near_Mem_IFC);
 			  Bit #(1)   sstatus_SUM,
 			  Bit #(1)   mstatus_MXR,
 			  WordXL     satp);    // { VM_Mode, ASID, PPN_for_page_table }
-         $display("dmem.req op ", fshow(op), " f3 ", fshow(f3), " addr ", addr, " value ", fshow(store_value));
 	 dcache.req (op, f3,
 `ifdef ISA_A
 		     amo_funct7,

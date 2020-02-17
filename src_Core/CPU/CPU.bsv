@@ -155,7 +155,7 @@ module mkCPU (CPU_IFC);
    // For debugging
 
    // Verbosity: 0=quiet; 1=instruction trace; 2=more detail
-   Reg #(Bit #(4))  cfg_verbosity <- mkConfigReg (2);
+   Reg #(Bit #(4))  cfg_verbosity <- mkConfigReg (0);
 
    // Verbosity is 0 as long as # of instrs retired is <= cfg_logdelay
    Reg #(Bit #(64))  cfg_logdelay <- mkConfigReg (0);
@@ -285,7 +285,7 @@ module mkCPU (CPU_IFC);
 
    function fa_emit_instr_trace (instret, pc, instr, priv);
       action
-	 if (cur_verbosity >= 1)
+	 if (cur_verbosity == 1)
 	    $display ("instret:%0d  PC:0x%0h  instr:0x%0h  priv:%0d", instret, pc, instr, priv);
       endaction
    endfunction
@@ -687,10 +687,7 @@ module mkCPU (CPU_IFC);
 			&& (stage1.out.ostatus == OSTATUS_NONPIPE)
 			&& (stage1.out.control == CONTROL_TRAP)
 			&& (! break_into_Debug_Mode));
-      if (True || cur_verbosity > 1) $display ("%0d: %m.rl_stage1_trap: ", mcycle, fshow(stage1.out.control));
-      $display("trap_info:  ", fshow(stage1.out.trap_info));
-      $display("instr:      ", fshow(stage1.out.data_to_stage2.instr));
-      $display("trace_data: ", fshow(stage1.out.data_to_stage2.trace_data));
+      if (cur_verbosity > 1) $display ("%0d: %m.rl_stage1_trap: ", mcycle, fshow(stage1.out.control));
 
       // Just save relevant info and handle in next clock
       rg_trap_info       <= stage1.out.trap_info;
@@ -781,9 +778,11 @@ module mkCPU (CPU_IFC);
       fa_emit_instr_trace (minstret, epc, instr, rg_cur_priv);
 
       // Debug
-      if (cur_verbosity != 0)
-	 $display ("    mcause:0x%0h  epc 0x%0h  tval:0x%0h  next_pc 0x%0h, new_priv %0d new_mstatus 0x%0h",
+      if (cur_verbosity > 1) begin
+	 $display ("%0d: %m.rl_trap", mcycle);
+	 $display ("    mcause: 0x%0h  epc: 0x%0h  tval: 0x%0h  next_pc: 0x%0h new_priv: %0d new_mstatus: 0x%0h",
 		   mcause, epc, tval, next_pc, new_priv, new_mstatus);
+      end
    endrule: rl_trap
 
    // ================================================================
@@ -1400,12 +1399,11 @@ module mkCPU (CPU_IFC);
 				     && (stage1.out.ostatus == OSTATUS_NONPIPE)
 				     && (stage1.out.control == CONTROL_TRAP)
 				     && break_into_Debug_Mode);
-      if (True || cur_verbosity > 1) $display ("%0d: %m.rl_trap_BREAK_to_Debug_Mode", mcycle);
+      if (cur_verbosity > 1) $display ("%0d: %m.rl_trap_BREAK_to_Debug_Mode", mcycle);
 
       let pc    = stage1.out.data_to_stage2.pc;
       let instr = stage1.out.data_to_stage2.instr;
 
-      $display ("%0d: %m.rl_trap_BREAK_to_Debug_Mode: PC 0x%08h instr 0x%08h", mcycle, pc, instr);
       if (cur_verbosity > 1)
 	 $display ("    Flushing caches");
 
