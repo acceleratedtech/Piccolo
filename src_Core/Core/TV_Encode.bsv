@@ -265,7 +265,7 @@ module mkTV_Encode (TV_Encode_IFC);
       let td <- pop (f_trace_data);
 
       let funct3 = instr_funct3 (td.instr);    // TODO: what if it's a 16b instr?
-      let mem_req_size = funct3 [1:0];
+      let mem_req_size = funct3_to_MemReqSize(funct3);
 
       // Encode components of td into byte vecs
       match { .n0, .vb0 } = encode_byte (te_op_begin_group);
@@ -290,7 +290,7 @@ module mkTV_Encode (TV_Encode_IFC);
       let td <- pop (f_trace_data);
 
       let funct3 = instr_funct3 (td.instr);    // TODO: what if it's a 16b instr?
-      let mem_req_size = funct3 [1:0];
+      let mem_req_size = funct3_to_MemReqSize(funct3);
 
       // Encode components of td into byte vecs
       match { .n0, .vb0 } = encode_byte (te_op_begin_group);

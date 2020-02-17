@@ -210,15 +210,11 @@ deriving (Bits, FShow);
 // Check if addr is aligned
 
 function Bool fn_is_aligned (Bit #(3) f3, Bit #(n) addr);
-   return (    (f3 [1:0] == 2'b00)                                // B, BU
-	   || ((f3 [1:0] == 2'b01) && (addr [0] == 1'b0))         // H, HU
-	   || ((f3 [1:0] == 2'b10) && (addr [1:0] == 2'b00))      // W, WU
-`ifdef RV32
-	   || ((f3 [1:0] == 2'b10) && (addr [2:0] == 3'b000))     // D (but this is not legal RV32 instruction?
-	   || ((f3 [2:0] == 3'b111) && (addr [1:0] == 2'b00))     // TAG (32 bits)
-`else
-	   || ((f3 [1:0] == 2'b11) && (addr [2:0] == 3'b000))     // D
-`endif
+   MemReqSize size = funct3_to_MemReqSize(f3);
+   return (    (size == 2'b00)                                // B, BU
+	   || ((size == 2'b01) && (addr [0] == 1'b0))         // H, HU
+	   || ((size == 2'b10) && (addr [1:0] == 2'b00))      // W, WU
+	   || ((size == 2'b10) && (addr [2:0] == 3'b000))     // D
 	   );
 endfunction
 
@@ -226,14 +222,11 @@ endfunction
 // Convert RISC-V funct3 code into AXI4_Size code (number of bytes in a beat)
 
 function AXI4_Size fn_funct3_to_AXI4_Size (Bit #(3) funct3);
-   Bit #(2)   x = funct3 [1:0];
+   Bit #(2)   x = funct3_to_MemReqSize(funct3);
    AXI4_Size  result;
    if      (x == f3_SIZE_B)        result = axsize_1;
    else if (x == f3_SIZE_H)        result = axsize_2;
    else if (x == f3_SIZE_W)        result = axsize_4;
-`ifdef RV32
-   else if (funct3 == f3_LDST_TAG) result = axsize_4;
-`endif
    else /* if (x == f3_SIZE_D) */  result = axsize_8;
    return result;
 endfunction
@@ -258,7 +251,7 @@ function Tuple4 #(Fabric_Addr,    // addr is 32b- or 64b-aligned
    Bit #(64)  addr64      = zeroExtend (addr);
    AXI4_Size  axsize      = axsize_128;    // Will be updated in 'case' below
 
-   case (f3 [1:0])
+   case (funct3_to_MemReqSize(f3))
       f3_SIZE_B: begin
 		    word64   = (word64 << shift_bits);
 		    strobe64 = ('b_1   << shift_bytes);
@@ -339,6 +332,10 @@ function Word64_Set fn_update_word64_set (Word64_Set   old_word64_set,
 		 'h4 : new_word64 [63:32] = word64 [31:0];
 	      endcase
       f3_SD:  new_word64 = word64;
+      f3_LDST_TAG:  case (addr_lsbs)
+		 'h0 : new_word64 [31:0]  = word64 [31:0];
+		 'h4 : new_word64 [63:32] = word64 [31:0];
+	      endcase
    endcase
    new_word64_set [way] = new_word64;
    return new_word64_set;
@@ -975,7 +972,8 @@ module mkMMU_Cache  #(parameter Bool dmem_not_imem)  (MMU_Cache_IFC);
 	 Access_RWX rwx= (dmem_not_imem
 			  ? ((rg_op == CACHE_LD) ? Access_RWX_R : Access_RWX_W)
 			  : Access_RWX_X);
-	 Bool pmp_ok <- pmpu.permitted (vm_xlate_result.pa, rg_f3 [1:0], rg_priv, rwx);
+	 MemReqSize size = funct3_to_MemReqSize(rg_f3);
+	 Bool pmp_ok <- pmpu.permitted (vm_xlate_result.pa, size, rg_priv, rwx);
 
 	 // PMP exception
 	 if (! pmp_ok) begin
