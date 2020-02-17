@@ -23,6 +23,9 @@ int main(int argc, char* argv[]) {
 
     printf("&tags[0] = 0x%x\n", (int) &tags[0]);
 
+    printf("Hello, %s!\n", world_string);
+    printf("x = %d\n", x);
+
     LOAD_TAG(x, &tags[0]);
     STORE_TAG(x, &tags[1]);
 

@@ -57,13 +57,18 @@ void printHex(int x) {
 void printInt(int x) {
     int i = 0;
     int d = 1;
-    while ((x / d) > 10) {
-        i++;
-        d*=10;
-    }
-    while (d > 0) {
-        printDigit((x / d) % 10);
-        d /= 10;
+    if (x < 0) {
+        printChar('-');
+        printInt(-x);
+    } else {
+        while ((x / d) > 10) {
+            i++;
+            d*=10;
+        }
+        while (d > 0) {
+            printDigit((x / d) % 10);
+            d /= 10;
+        }
     }
 }
 

@@ -26,5 +26,5 @@ util.o: util.c util.h tagging_macros.h
 
 .PHONY: clean
 clean:
-	rm -rf Mem.hex main.dump main *.o
+	rm -rf Mem.hex main.dump main *.o symbol_table.txt
 

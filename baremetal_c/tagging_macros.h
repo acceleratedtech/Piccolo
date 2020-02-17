@@ -71,6 +71,7 @@
 #define LOAD_TAG(data, tag_location) asm ("mv t5, %1\n\t" \
                                           "mv t6, %0\n\t" \
                                           LOAD_TAG_ASM( REG_t6, REG_t5 ) "\n\t" \
+                                          "nop\n\t" \
                                           "mv %0, t6" \
                                         : "+r" (data) \
                                         : "r" (tag_location) \
