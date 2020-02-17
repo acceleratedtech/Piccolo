@@ -879,6 +879,7 @@ function ALU_Outputs fv_ST (ALU_Inputs inputs, TagMonitor#(XLEN, TagT) tagger);
 `else
    alu_outputs.val2      = inputs.rs2_val;
 `endif
+   alu_outputs.tag2      = inputs.rs2_tag;
 
    // Normal trace output (if no trap)
    alu_outputs.trace_data = mkTrace_STORE (fall_through_pc (inputs),
@@ -1175,6 +1176,7 @@ function ALU_Outputs fv_AMO (ALU_Inputs inputs, TagMonitor#(XLEN, TagT) tagger);
 `else
    alu_outputs.val2      = inputs.rs2_val;
 `endif
+   alu_outputs.tag2      = inputs.rs2_tag;
 
    // Normal trace output (if no trap)
    alu_outputs.trace_data = mkTrace_AMO (fall_through_pc (inputs),
