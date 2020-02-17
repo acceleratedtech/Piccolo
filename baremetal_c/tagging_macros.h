@@ -70,7 +70,7 @@
 
 #define LOAD_TAG(data, tag_location) asm ("mv t5, %1\n\t" \
                                           "mv t6, %0\n\t" \
-                                          LOAD_TAG_ASM( REG_t5, REG_t6 ) "\n\t" \
+                                          LOAD_TAG_ASM( REG_t6, REG_t5 ) "\n\t" \
                                           "mv %0, t6" \
                                         : "+r" (data) \
                                         : "r" (tag_location) \
@@ -78,7 +78,7 @@
 
 #define STORE_TAG(tagged_data, tag_location) asm ("mv t5, %1\n\t" \
                                                   "mv t6, %0\n\t" \
-                                                  STORE_TAG_ASM( REG_t5, REG_t6 ) \
+                                                  STORE_TAG_ASM( REG_t6, REG_t5 ) \
                                                 : \
                                                 : "r" (tagged_data), \
                                                   "r" (tag_location) \
