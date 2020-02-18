@@ -387,6 +387,19 @@ MemReqSize f3_SIZE_H = 2'b01;
 MemReqSize f3_SIZE_W = 2'b10;
 MemReqSize f3_SIZE_D = 2'b11;
 
+function MemReqSize funct3_to_MemReqSize(Bit#(3) funct3);
+`ifdef RV32
+// RV32 has 32-bit tags
+    if (funct3 == 3'b111) begin
+        return f3_SIZE_W;
+    end else begin
+        return funct3[1:0];
+    end
+`else
+    return funct3[1:0];
+`endif
+endfunction
+
 // ----------------
 // Load instructions
 
