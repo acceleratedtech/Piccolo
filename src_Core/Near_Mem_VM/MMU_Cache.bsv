@@ -222,7 +222,7 @@ endfunction
 // Convert RISC-V funct3 code into AXI4_Size code (number of bytes in a beat)
 
 function AXI4_Size fn_funct3_to_AXI4_Size (Bit #(3) funct3);
-   Bit #(2)   x = funct3_to_MemReqSize(funct3);/
+   Bit #(2)   x = funct3_to_MemReqSize(funct3);
    AXI4_Size  result;
    if      (x == f3_SIZE_B)        result = axsize_1;
    else if (x == f3_SIZE_H)        result = axsize_2;
