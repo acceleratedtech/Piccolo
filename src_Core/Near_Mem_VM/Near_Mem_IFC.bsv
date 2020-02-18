@@ -139,6 +139,17 @@ interface DMem_IFC;
    (* always_ready *)  method Exc_Code   exc_code;
 endinterface
 
+function Bit #(3) fn_f3_width(Bit #(3) f3);
+   if (f3 == f3_LDST_TAG) begin
+`ifdef RV32
+      f3 = f3_LWU;
+`else
+      f3 = f3_LD;
+`endif
+   end
+   return f3;
+endfunction
+
 // ================================================================
 // Extract bytes from raw word read from near-mem.
 // The bytes of interest are offset according to LSBs of addr.
@@ -152,6 +163,8 @@ endinterface
 function Bit #(64) fn_extract_and_extend_bytes (Bit #(3) f3, WordXL byte_addr, Bit #(64) word64);
    Bit #(64) result    = 0;
    Bit #(3)  addr_lsbs = byte_addr [2:0];
+
+   f3 = fn_f3_width(f3);
 
    case (f3)
       f3_LB: case (addr_lsbs)
@@ -200,15 +213,6 @@ function Bit #(64) fn_extract_and_extend_bytes (Bit #(3) f3, WordXL byte_addr, B
       f3_LD: case (addr_lsbs)
 		'h0: result = word64;
 	     endcase
-
-      f3_LDST_TAG: case (addr_lsbs)
-`ifdef RV32
-		'h0: result = zeroExtend (word64 [31: 0]);
-		'h4: result = zeroExtend (word64 [63:32]);
-`else
-		'h0: result = word64;
-`endif
-	     endcase
    endcase
    return result;
 endfunction
@@ -226,6 +230,7 @@ endfunction
 
 function Bit #(64) fn_extend_bytes (Bit #(3) f3, Bit #(64) word64);
    Bit #(64) result = 0;
+   f3 = fn_f3_width(f3);
    case (f3)
       f3_LB:  result = signExtend (word64 [ 7: 0]);
       f3_LBU: result = zeroExtend (word64 [ 7: 0]);
@@ -237,11 +242,6 @@ function Bit #(64) fn_extend_bytes (Bit #(3) f3, Bit #(64) word64);
       f3_LWU: result = zeroExtend (word64 [31: 0]);
 
       f3_LD:  result = word64;
-`ifdef RV32
-      f3_LDST_TAG:  result = signExtend (word64 [31: 0]);
-`else
-      f3_LDST_TAG:  result = word64;
-`endif
    endcase
 
    return result;
