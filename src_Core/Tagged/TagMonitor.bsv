@@ -41,9 +41,6 @@ module mkTagMonitor#(Bit#(XLEN) tagctrl, Vector#(8, Bit#(XLEN)) tagCSRs)(TagMoni
     let policy = tp.policy;
 
     Bool tagActive = unpack(tagctrl[0]);
-    rule rl_tag_active if (tagActive);
-        $display("tag active");
-    endrule
     function TagT applyTagFn(function TagT tag_fn(ArgsAndCsrs args), TaggedData#(XLEN, TagT) v1, TaggedData#(XLEN, TagT) v2, Bit#(XLEN) result);
         Struct3 args = Struct3 { a: tagActive,
                                 aa: tagCSRs[0],     aaa:     tagCSRs[1],     aaaa: tagCSRs[2], aaaaa:     tagCSRs[3],
