@@ -435,7 +435,7 @@ module mkMMU_Cache  #(parameter Bool dmem_not_imem)  (MMU_Cache_IFC);
    String d_or_i = (dmem_not_imem ? "D_MMU_Cache" : "I_MMU_Cache");
 
    // Verbosity: 0: quiet; 1 reset info; 2: + detail; 3: cache refill loop detail
-   Integer verbosity = (dmem_not_imem ? 0 : 0);
+   Integer verbosity = (dmem_not_imem ? 2 : 2);
    Reg #(Bit #(4)) cfg_verbosity <- mkConfigReg (fromInteger (verbosity));
 
    // Overall state of this module

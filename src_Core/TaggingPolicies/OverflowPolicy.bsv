@@ -7,6 +7,8 @@ import Vector       :: *;
 import ISA_Decls       :: *;
 import TagMonitor_IFC  :: *;
 
+Integer msbpos = xlen - 1;
+
 instance DefaultValue#(Struct2);
     defaultValue = Struct2 { unknown_tag: False, signed_overflow: False, unsigned_overflow: False };
 endinstance
@@ -107,10 +109,10 @@ module
         end
         Struct2 x_18 = (x_17);
         let x_20 = ?;
-        if ((! (((((x_11).data)[63:63]) < (((x_12).data)[63:63])) ||
-        ((((x_12).data)[63:63]) < (((x_11).data)[63:63])))) &&
-        (((((x_11).data)[63:63]) < ((x_13)[63:63])) || (((x_13)[63:63]) <
-        (((x_11).data)[63:63])))) begin
+        if ((! (((((x_11).data)[msbpos:msbpos]) < (((x_12).data)[msbpos:msbpos])) ||
+        ((((x_12).data)[msbpos:msbpos]) < (((x_11).data)[msbpos:msbpos])))) &&
+        (((((x_11).data)[msbpos:msbpos]) < ((x_13)[msbpos:msbpos])) || (((x_13)[msbpos:msbpos]) <
+        (((x_11).data)[msbpos:msbpos])))) begin
         
             Struct2 x_19 = (Struct2 {unknown_tag : (x_18).unknown_tag,
             signed_overflow : (Bool)'(True), unsigned_overflow :
@@ -201,10 +203,10 @@ module
         end
         Struct2 x_18 = (x_17);
         let x_20 = ?;
-        if ((! (((((x_11).data)[63:63]) < (~(((x_12).data)[63:63]))) ||
-        ((~(((x_12).data)[63:63])) < (((x_11).data)[63:63])))) &&
-        (((((x_11).data)[63:63]) < ((x_13)[63:63])) || (((x_13)[63:63]) <
-        (((x_11).data)[63:63])))) begin
+        if ((! (((((x_11).data)[msbpos:msbpos]) < (~(((x_12).data)[msbpos:msbpos]))) ||
+        ((~(((x_12).data)[msbpos:msbpos])) < (((x_11).data)[msbpos:msbpos])))) &&
+        (((((x_11).data)[msbpos:msbpos]) < ((x_13)[msbpos:msbpos])) || (((x_13)[msbpos:msbpos]) <
+        (((x_11).data)[msbpos:msbpos])))) begin
         
             Struct2 x_19 = (Struct2 {unknown_tag : (x_18).unknown_tag,
             signed_overflow : (Bool)'(True), unsigned_overflow :

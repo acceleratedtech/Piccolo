@@ -5,21 +5,26 @@ import TagMonitor_IFC::*;
 
 `ifdef OVERFLOW_POLICY
 import OverflowPolicy       ::*;
+`define HAS_POLICY
 `endif
 `ifdef PUBLIC_ACCESS_POLICY
 import PublicAccessPolicy   :: *;
+`define HAS_POLICY
 `endif
 `ifdef SIZED_POINTER_POLICY
 import SizedPointerPolicy   :: *;
+`define HAS_POLICY
 `endif
 `ifdef USER_INFLUENCED_POLICY
 import UserInfluencedPolicy :: *;
+`define HAS_POLICY
 `endif
 
 import ISA_Decls :: *;
 
 export TagMonitor, mkTagMonitor, TagT(..), TaggedData(..);
 
+`ifdef HAS_POLICY
 typedef Struct2 TagT;
 typedef Struct3 ArgsAndCsrs;
 typedef Module2 Policy;
@@ -38,6 +43,7 @@ module mkTagMonitor#(Bit#(XLEN) tagctrl, Vector#(8, Bit#(XLEN)) tagCSRs)(TagMoni
 `ifdef USER_INFLUENCED_POLICY
     let tp <- mkUserInfluencedPolicy();
 `endif
+
     let policy = tp.policy;
 
     Bool tagActive = unpack(tagctrl[0]);
@@ -172,3 +178,12 @@ module mkTagMonitor#(Bit#(XLEN) tagctrl, Vector#(8, Bit#(XLEN)) tagCSRs)(TagMoni
     endmethod
 
 endmodule
+`endif // HAS_POLICY
+
+`ifndef HAS_POLICY
+typedef void TagT;
+
+module mkTagMonitor#(Bit#(XLEN) tagctrl, Vector#(8, Bit#(XLEN)) tagCSRs)(TagMonitor#(XLEN, TagT));
+    return voidTagMonitor;
+endmodule
+`endif
